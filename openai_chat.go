@@ -81,6 +81,7 @@ func CountChatRequest(req ChatRequest, opts Options) (Breakdown, error) {
 	}
 	out.TextTokens = out.System + out.Messages + out.Tools - out.Images
 	out.Total = out.System + out.Messages + out.Tools
+	applySafetyMargin(&out, opts, len(req.Messages), len(req.Tools), out.ImageCount)
 	return out, nil
 }
 

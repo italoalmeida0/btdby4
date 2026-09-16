@@ -141,6 +141,7 @@ func finishResponses(out *Breakdown, req ResponsesRequest, opts Options) (Breakd
 	}
 	out.TextTokens = out.System + out.Messages + out.Tools - out.Images
 	out.Total = out.System + out.Messages + out.Tools
+	applySafetyMargin(out, opts, len(out.ByMessage), len(req.Tools), out.ImageCount)
 	return *out, nil
 }
 

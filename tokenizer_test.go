@@ -58,7 +58,7 @@ func TestCountRequest(t *testing.T) {
 			{Name: "get_weather", Description: "Get the current weather", InputSchema: map[string]any{"type": "object"}},
 		},
 	}
-	out, err := btdby4.CountAnthropicRequest(req, btdby4.Options{})
+	out, err := btdby4.CountAnthropicRequest(req, btdby4.Options{Tight: true})
 	if err != nil {
 		t.Fatalf("CountAnthropicRequest error: %v", err)
 	}
@@ -131,7 +131,7 @@ func TestImageInRequest(t *testing.T) {
 	}
 	txt, _ := btdby4.CountText("what is this?")
 	img := btdby4.CountImageBase64(png1x1)
-	out, err := btdby4.CountAnthropicRequest(req, btdby4.Options{})
+	out, err := btdby4.CountAnthropicRequest(req, btdby4.Options{Tight: true})
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
@@ -141,7 +141,7 @@ func TestImageInRequest(t *testing.T) {
 	if out.Total != txt+img {
 		t.Errorf("total = %d, want %d", out.Total, txt+img)
 	}
-	out2, _ := btdby4.CountAnthropicRequest(req, btdby4.Options{IgnoreImages: true})
+	out2, _ := btdby4.CountAnthropicRequest(req, btdby4.Options{IgnoreImages: true, Tight: true})
 	if out2.Images != 0 || out2.Total != txt {
 		t.Errorf("excluded: got %+v", out2)
 	}
@@ -197,7 +197,7 @@ func TestCountChatRequest(t *testing.T) {
 			{Type: "function", Function: btdby4.ChatFunctionDef{Name: "get_weather", Description: "Get the current weather", Parameters: map[string]any{"type": "object"}}},
 		},
 	}
-	out, err := btdby4.CountChatRequest(req, btdby4.Options{})
+	out, err := btdby4.CountChatRequest(req, btdby4.Options{Tight: true})
 	if err != nil {
 		t.Fatalf("CountChatRequest error: %v", err)
 	}
@@ -229,14 +229,14 @@ func TestCountChatImageURL(t *testing.T) {
 	}
 	txt, _ := btdby4.CountText("what is this?")
 	img := btdby4.CountImageBase64("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
-	out, err := btdby4.CountChatRequest(req, btdby4.Options{})
+	out, err := btdby4.CountChatRequest(req, btdby4.Options{Tight: true})
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
 	if out.Images != img || out.ImageCount != 1 || out.Total != txt+img {
 		t.Errorf("chat img: got %+v want img %d", out, img)
 	}
-	out2, _ := btdby4.CountChatRequest(req, btdby4.Options{IgnoreImages: true})
+	out2, _ := btdby4.CountChatRequest(req, btdby4.Options{IgnoreImages: true, Tight: true})
 	if out2.Images != 0 || out2.Total != txt {
 		t.Errorf("excluded: got %+v", out2)
 	}
@@ -259,7 +259,7 @@ func TestCountResponsesRequest(t *testing.T) {
 			{Type: "function", Name: "get_weather", Description: "Get the current weather", Parameters: map[string]any{"type": "object"}},
 		},
 	}
-	out, err := btdby4.CountResponsesRequest(req, btdby4.Options{})
+	out, err := btdby4.CountResponsesRequest(req, btdby4.Options{Tight: true})
 	if err != nil {
 		t.Fatalf("CountResponsesRequest error: %v", err)
 	}
@@ -636,5 +636,70 @@ func TestFullPayloadParity(t *testing.T) {
 	}
 	if _, err := btdby4.CountResponsesRequestJSON([]byte(`{"instructions":"hi"}`), btdby4.Options{}); err != nil {
 		t.Errorf("CountResponsesRequestJSON: %v", err)
+	}
+}
+
+func TestConservativeIsUpperBound(t *testing.T) {
+	chat := btdby4.ChatRequest{
+		Messages: []btdby4.ChatMessage{{Role: "user", Content: "hello world"}},
+		Tools: []btdby4.ChatTool{
+			{Type: "function", Function: btdby4.ChatFunctionDef{Name: "get_weather", Description: "Get weather"}},
+		},
+	}
+	tight, err := btdby4.CountChatRequest(chat, btdby4.Options{Tight: true})
+	if err != nil {
+		t.Fatalf("tight: %v", err)
+	}
+	safe, err := btdby4.CountChatRequest(chat, btdby4.Options{})
+	if err != nil {
+		t.Fatalf("default: %v", err)
+	}
+	// Default carries the margin: 1 message * 12 + tools fixed 500 +
+	// 1 tool * 45 = 557.
+	if want := tight.Total + 557; safe.Total != want {
+		t.Errorf("default total = %d, want %d (tight %d)", safe.Total, want, tight.Total)
+	}
+	if safe.TextTokens != tight.TextTokens {
+		t.Errorf("margin must not change TextTokens: %d vs %d", safe.TextTokens, tight.TextTokens)
+	}
+	if safe.Total <= tight.Total {
+		t.Errorf("default total %d should exceed tight %d", safe.Total, tight.Total)
+	}
+	// Conservative: true is a no-op alias of the default.
+	legacy, err := btdby4.CountChatRequest(chat, btdby4.Options{Conservative: true})
+	if err != nil {
+		t.Fatalf("legacy flag: %v", err)
+	}
+	if legacy.Total != safe.Total {
+		t.Errorf("Conservative: true = %d, want default %d", legacy.Total, safe.Total)
+	}
+
+	// No tools, no images: margin is just per-message.
+	plain := btdby4.ChatRequest{
+		Messages: []btdby4.ChatMessage{
+			{Role: "user", Content: "hi"},
+			{Role: "assistant", Content: "hello"},
+		},
+	}
+	pb, _ := btdby4.CountChatRequest(plain, btdby4.Options{Tight: true})
+	ps, _ := btdby4.CountChatRequest(plain, btdby4.Options{})
+	if want := pb.Total + 2*12; ps.Total != want {
+		t.Errorf("plain default = %d, want %d", ps.Total, want)
+	}
+
+	// Anthropic and Responses apply the same margin shape.
+	areq := btdby4.AnthropicRequest{
+		Messages: []btdby4.AnthropicMessage{{Role: "user", Content: "hi"}},
+	}
+	ab, _ := btdby4.CountAnthropicRequest(areq, btdby4.Options{Tight: true})
+	as, _ := btdby4.CountAnthropicRequest(areq, btdby4.Options{})
+	if want := ab.Total + 12; as.Total != want {
+		t.Errorf("anthropic default = %d, want %d", as.Total, want)
+	}
+	rreq := btdby4.ResponsesRequest{Instructions: "hi", Input: "hello"}
+	rb, _ := btdby4.CountResponsesRequest(rreq, btdby4.Options{Tight: true})
+	rs, _ := btdby4.CountResponsesRequest(rreq, btdby4.Options{})
+	if want := rb.Total + 12; rs.Total != want {
+		t.Errorf("responses default = %d, want %d", rs.Total, want)
 	}
 }

@@ -279,10 +279,30 @@ btdby4.CountImageSize(1024, 768) // tiles after fit
 ```go
 type Options struct {
     IgnoreImages bool // count images as zero
+    Tight        bool // opt out of the safety margin: closest point estimate
 }
 ```
 
-That's the only knob. Encrypted thinking (`redacted_thinking` data,
+### Bias: over or under?
+
+`Total` ships with a small generic safety margin on top of the content
+count (BPE text + tile area + encrypted-thinking estimate), so against
+billed `prompt_tokens` / `input_tokens` it lands **at or above** the real
+total in the common cases — install-and-use safe for budget enforcement
+and automatic compaction: compacting at 90% of the window fires *before*
+the real context fills up instead of after. The margin is generic (no
+per-provider or per-model tables): +12 per message, +500 with tools plus
++45 per tool, +1100 per image — sized to cover the worst provider
+measured (tool-harness preamble ~500 fixed + ~40/tool; minimum billable
+cost per small image up to ~1000), while staying negligible at long
+context (a dozen tokens against 200k+). `TextTokens` always keeps the
+pure content count with no margin; pass `Options{Tight: true}` to get
+the closest point estimate in `Total` as well (display/cost paths).
+Without the margin the estimator would sit **at or below** billed usage
+by that same fixed overhead — fine for estimates, late for compaction
+triggers.
+
+Encrypted thinking (`redacted_thinking` data,
 Responses `encrypted_content`, Google `thought_signature` — any provider,
 any model, any protocol, even a Gemini payload inside Responses or a GPT
 payload inside Anthropic blocks) is opaque ciphertext, so it is estimated,
@@ -305,24 +325,6 @@ go get github.com/italoalmeida0/btdby4
 
 Requires Go 1.18+. No external dependencies. Builds on
 windows/linux/darwin × amd64/arm64.
-
-## How fast is exact?
-
-Measured on a 12-core ARM64 box, sustained throughput on varied
-production-like requests (text + images). The engine scales linearly, so a
-256K-token context counts in ~0.7 ms:
-
-| Context window | Count time |
-|---|---|
-| 256K tokens | ~0.7 ms |
-| 512K tokens | ~1.4 ms |
-| 1M tokens | ~2.8 ms |
-| 1.5M tokens | ~4.2 ms |
-
-Same hardware, same ~350K-token request: a regex-based Go counter takes
-~110 ms, tiktoken-rs (Rust) ~108 ms, HF tokenizers (Python) ~325 ms.
-BTDby4 takes **under 1 ms** — because it counts instead of encoding: no
-token-ID vectors are ever materialized.
 
 ## How it works
 

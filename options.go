@@ -102,10 +102,59 @@ func isCompactSignature(enc string) bool {
 }
 
 // Options tunes counting. IgnoreImages counts images as zero.
+//
+// Total always includes a small generic safety margin on top of the
+// content count, so the default estimate lands at or above the
+// provider-billed total in the common cases — install-and-use safe for
+// budget enforcement and automatic compaction (compacting on Total
+// fires before the real context fills up instead of after). TextTokens
+// keeps the pure content count; set Tight: true to get the closest
+// point estimate in Total as well (display/cost paths).
 type Options struct {
 	IgnoreImages bool
+	// Tight disables the built-in safety margin and returns the
+	// closest point estimate. Default (false) keeps the margin.
+	Tight bool
+	// Conservative is deprecated and has no effect: the safety margin
+	// is now the default. Kept for compatibility; use Tight: true to
+	// opt out of it.
+	Conservative bool
 }
 
 func estimateImageURLTokens() int {
 	return 0
+}
+
+// Conservative upper-bound margins, applied by default (see Options).
+// They cover provider-side framing that is not part of the request
+// content: per-message wire overhead, the tool harness preamble plus
+// per-tool registration cost, and the minimum billable cost of one
+// image. Values are generic (no per-provider or per-model tables):
+// they are sized to cover the worst provider measured (Meta ~500 fixed
+// + ~40/tool on chat, Google ~1080 floor on tiny images) while staying
+// small relative to long contexts (a few hundred tokens against 200k+).
+const (
+	conservativePerMessage = 12
+	conservativeToolsFixed = 500
+	conservativePerTool    = 45
+	conservativePerImage   = 1100
+)
+
+// applySafetyMargin adds the generic safety margin to a finished
+// Breakdown, unless Options.Tight opts out. TextTokens keeps the pure
+// content count; Total becomes the upper bound used for budgets and
+// compaction.
+func applySafetyMargin(out *Breakdown, opts Options, nMessages, nTools, nImages int) {
+	if opts.Tight {
+		return
+	}
+	if opts.IgnoreImages {
+		nImages = 0
+	}
+	margin := nMessages * conservativePerMessage
+	if nTools > 0 {
+		margin += conservativeToolsFixed + nTools*conservativePerTool
+	}
+	margin += nImages * conservativePerImage
+	out.Total += margin
 }
