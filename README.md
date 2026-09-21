@@ -317,6 +317,49 @@ provider shapes (median error ~5%).
 |---|---|---|
 | `EstimateThinkingTokens` | `EstimateThinkingTokens(enc string) int` | Automatic estimate for one envelope (empty → 0). |
 
+## 🥟 Bun & JavaScript Bindings (`bun:ffi`)
+
+BTDby4 provides official native bindings for [Bun](https://bun.sh) via `bun:ffi` located in [`bun/`](./bun), delivering Go-level performance directly to TypeScript and JavaScript runtimes with **zero npm dependencies**.
+
+Pre-compiled dynamic libraries are included for **all 8 major platforms and environments**:
+- **Windows**: `x64` (amd64), `arm64`
+- **Linux glibc**: `x64` (amd64), `arm64` (Ubuntu, Debian, Fedora, Arch)
+- **Linux musl**: `x64` (amd64), `arm64` (Alpine Linux, minimal Docker images)
+- **macOS**: `Apple Silicon` (arm64), `Intel` (x64)
+
+The TypeScript wrapper automatically detects the OS, CPU architecture, and whether the system runs **glibc** or **musl**, loading the correct binary without any manual configuration.
+
+```typescript
+import btdby4 from "./bun";
+
+const estimator = btdby4();
+
+// 1. Text token counting (~1µs)
+console.log(estimator.countText("Hello, world!")); // 2
+
+// 2. Whole OpenAI Chat completions request (~50µs)
+const total = estimator.countChatTotal({
+  model: "gpt-4o",
+  messages: [
+    { role: "system", content: "You are a helpful assistant." },
+    { role: "user", content: "Hello!" }
+  ]
+});
+```
+
+### Bun FFI Performance vs JavaScript (`tokenx`)
+
+Benchmark results on a real **8.3 MB conversation session (~700K tokens across 2,626 messages)** comparing native `btdby4` (`bun:ffi`) against the pure JavaScript [`tokenx`](https://www.npmjs.com/package/tokenx) package:
+
+| Scenario | Payload Size | `tokenx` (JavaScript) | `btdby4` (Bun FFI) | Speedup Multiplier |
+|---|---|---|---|---|
+| **Structured Chat Request** | 2,626 messages (~650k tokens) | ~220 ms (11.9k msg/s) | **~59 ms (44.4k msg/s)** | **~2.9x – 4.4x faster** |
+| **Pure Conversation Text** | 1.75 MB pure text (~613k tokens) | ~182 ms (9.6 MB/s) | **~29 ms (59.8 MB/s)** | **~5.8x – 6.2x faster** |
+| **Full Session JSONL File** | 8.3 MB raw file (~2.98M tokens) | ~825 ms (9.6 MB/s) | **~144 ms (54.8 MB/s)** | **~5.7x – 6.0x faster** |
+| **Micro-Call Latency** | 50,000 iterations | ~10.5 µs/call | **~1.14 µs/call (~875k ops/s)** | **~9.2x faster** |
+
+For complete documentation on all 18 exported functions and detailed options, see [`bun/README.md`](./bun/README.md).
+
 ## Install
 
 ```bash

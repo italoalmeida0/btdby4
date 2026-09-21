@@ -1,0 +1,25 @@
+{
+  "name": "btdby4-bun",
+  "version": "1.0.0",
+  "description": "High-performance native BTDby4 LLM token estimator for Bun using bun:ffi",
+  "main": "index.ts",
+  "types": "index.ts",
+  "type": "module",
+  "scripts": {
+    "test": "bun test.ts",
+    "build": "powershell -File ./build.ps1"
+  },
+  "keywords": [
+    "btdby4",
+    "tokens",
+    "tokenizer",
+    "bun",
+    "bun-ffi",
+    "ffi",
+    "llm",
+    "openai",
+    "anthropic"
+  ],
+  "author": "Italo Almeida",
+  "license": "MIT"
+}
