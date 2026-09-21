@@ -94,15 +94,8 @@ export async function initBTDby4(wasmSource?: WasmSource): Promise<BTDby4Instanc
     if (!wasmSource) {
       if (typeof process !== "undefined" && process.versions && (process.versions.node || process.versions.bun)) {
         const { readFileSync } = await import("fs");
-        const { fileURLToPath } = await import("url");
-        const { dirname, join } = await import("path");
-        let wasmPath: string;
-        try {
-          wasmPath = join(dirname(fileURLToPath(import.meta.url)), "btdby4.wasm");
-        } catch {
-          wasmPath = join(__dirname, "btdby4.wasm");
-        }
-        bytes = readFileSync(wasmPath);
+        const wasmUrl = new URL("btdby4.wasm", import.meta.url);
+        bytes = readFileSync(wasmUrl);
       } else if (typeof fetch !== "undefined") {
         const res = await fetch("btdby4.wasm");
         bytes = await res.arrayBuffer();

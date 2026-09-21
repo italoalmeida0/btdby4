@@ -557,7 +557,6 @@ if (typeof globalThis !== "undefined" && !globalThis.crypto) {
 })();
 
 // index.ts
-var __dirname = "C:\\Users\\italo\\Downloads\\btdby4_repo\\wasm";
 var cachedInstance = null;
 var initPromise = null;
 async function initBTDby4(wasmSource) {
@@ -572,15 +571,8 @@ async function initBTDby4(wasmSource) {
     if (!wasmSource) {
       if (typeof process !== "undefined" && process.versions && (process.versions.node || process.versions.bun)) {
         const { readFileSync } = await import("fs");
-        const { fileURLToPath } = await import("url");
-        const { dirname, join } = await import("path");
-        let wasmPath;
-        try {
-          wasmPath = join(dirname(fileURLToPath(import.meta.url)), "btdby4.wasm");
-        } catch {
-          wasmPath = join(__dirname, "btdby4.wasm");
-        }
-        bytes = readFileSync(wasmPath);
+        const wasmUrl = new URL("btdby4.wasm", import.meta.url);
+        bytes = readFileSync(wasmUrl);
       } else if (typeof fetch !== "undefined") {
         const res = await fetch("btdby4.wasm");
         bytes = await res.arrayBuffer();
