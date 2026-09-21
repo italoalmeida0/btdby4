@@ -1,6 +1,6 @@
 {
   "name": "btdby4-bun",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "High-performance native BTDby4 LLM token estimator for Bun using bun:ffi",
   "main": "index.ts",
   "types": "index.ts",
@@ -28,8 +28,8 @@
     "directory": "bun"
   },
   "optionalDependencies": {
-    "btdby4-bun-win32-x64": "1.0.0",
-    "btdby4-bun-win32-arm64": "1.0.0",
+    "btdby4-bun-windows-x64": "1.0.0",
+    "btdby4-bun-windows-arm64": "1.0.0",
     "btdby4-bun-linux-x64-gnu": "1.0.0",
     "btdby4-bun-linux-arm64-gnu": "1.0.0",
     "btdby4-bun-linux-x64-musl": "1.0.0",

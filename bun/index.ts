@@ -77,10 +77,10 @@ export function getPlatformPackage(preferMusl?: boolean): { filename: string; pk
   if (platform === "win32") {
     if (arch === "arm64") {
       filename = "libbtdby4-windows-arm64.dll";
-      pkgName = "btdby4-bun-win32-arm64";
+      pkgName = "btdby4-bun-windows-arm64";
     } else {
       filename = "libbtdby4-windows-amd64.dll";
-      pkgName = "btdby4-bun-win32-x64";
+      pkgName = "btdby4-bun-windows-x64";
     }
   } else if (platform === "linux") {
     if (musl) {
