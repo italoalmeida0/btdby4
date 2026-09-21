@@ -1,0 +1,49 @@
+{
+  "name": "btdby4-wasm",
+  "version": "1.0.0",
+  "description": "Universal WebAssembly high-performance LLM token estimator for Node.js, Bun, Deno, and Browser",
+  "main": "./index.js",
+  "module": "./index.js",
+  "types": "./index.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js",
+      "default": "./index.js"
+    },
+    "./wasm": "./btdby4.wasm"
+  },
+  "files": [
+    "btdby4.wasm",
+    "wasm_exec.js",
+    "crypto_polyfill.js",
+    "index.js",
+    "index.d.ts",
+    "index.ts",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "pwsh -File build.ps1 && bun build ./index.ts --outfile ./index.js --target node",
+    "test": "bun test.ts"
+  },
+  "keywords": [
+    "tokens",
+    "tokenizer",
+    "bpe",
+    "llm",
+    "wasm",
+    "webassembly",
+    "openai",
+    "anthropic",
+    "claude",
+    "gpt-4",
+    "estimator"
+  ],
+  "author": "italoalmeida0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/italoalmeida0/btdby4.git"
+  }
+}
