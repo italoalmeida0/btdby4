@@ -21,5 +21,20 @@
     "anthropic"
   ],
   "author": "Italo Almeida",
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/italoalmeida0/btdby4.git",
+    "directory": "bun"
+  },
+  "optionalDependencies": {
+    "btdby4-bun-win32-x64": "1.0.0",
+    "btdby4-bun-win32-arm64": "1.0.0",
+    "btdby4-bun-linux-x64-gnu": "1.0.0",
+    "btdby4-bun-linux-arm64-gnu": "1.0.0",
+    "btdby4-bun-linux-x64-musl": "1.0.0",
+    "btdby4-bun-linux-arm64-musl": "1.0.0",
+    "btdby4-bun-darwin-x64": "1.0.0",
+    "btdby4-bun-darwin-arm64": "1.0.0"
+  }
 }

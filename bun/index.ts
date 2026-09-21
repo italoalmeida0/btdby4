@@ -64,30 +64,91 @@ export function isMuslLinux(): boolean {
 }
 
 /**
- * Resolves the appropriate pre-compiled native library based on current OS, CPU architecture, and libc.
+ * Returns the native library filename and corresponding platform npm package.
  */
-export function getDefaultLibraryPath(preferMusl?: boolean): string {
+export function getPlatformPackage(preferMusl?: boolean): { filename: string; pkgName: string } {
   const platform = process.platform;
   const arch = process.arch === "ia32" ? "amd64" : process.arch === "x64" ? "amd64" : process.arch;
   const musl = preferMusl ?? isMuslLinux();
 
   let filename = "";
+  let pkgName = "";
 
   if (platform === "win32") {
-    filename = arch === "arm64" ? "libbtdby4-windows-arm64.dll" : "libbtdby4-windows-amd64.dll";
+    if (arch === "arm64") {
+      filename = "libbtdby4-windows-arm64.dll";
+      pkgName = "btdby4-bun-win32-arm64";
+    } else {
+      filename = "libbtdby4-windows-amd64.dll";
+      pkgName = "btdby4-bun-win32-x64";
+    }
   } else if (platform === "linux") {
     if (musl) {
-      filename = arch === "arm64" ? "libbtdby4-linux-arm64-musl.so" : "libbtdby4-linux-amd64-musl.so";
+      if (arch === "arm64") {
+        filename = "libbtdby4-linux-arm64-musl.so";
+        pkgName = "btdby4-bun-linux-arm64-musl";
+      } else {
+        filename = "libbtdby4-linux-amd64-musl.so";
+        pkgName = "btdby4-bun-linux-x64-musl";
+      }
     } else {
-      filename = arch === "arm64" ? "libbtdby4-linux-arm64.so" : "libbtdby4-linux-amd64.so";
+      if (arch === "arm64") {
+        filename = "libbtdby4-linux-arm64.so";
+        pkgName = "btdby4-bun-linux-arm64-gnu";
+      } else {
+        filename = "libbtdby4-linux-amd64.so";
+        pkgName = "btdby4-bun-linux-x64-gnu";
+      }
     }
   } else if (platform === "darwin") {
-    filename = arch === "arm64" ? "libbtdby4-darwin-arm64.dylib" : "libbtdby4-darwin-amd64.dylib";
+    if (arch === "arm64") {
+      filename = "libbtdby4-darwin-arm64.dylib";
+      pkgName = "btdby4-bun-darwin-arm64";
+    } else {
+      filename = "libbtdby4-darwin-amd64.dylib";
+      pkgName = "btdby4-bun-darwin-x64";
+    }
   } else {
     throw new Error(`Unsupported platform for BTDby4: ${platform}-${arch}`);
   }
 
-  return resolve(import.meta.dir, "lib", filename);
+  return { filename, pkgName };
+}
+
+/**
+ * Resolves the appropriate pre-compiled native library based on current OS, CPU architecture, and libc.
+ * Checks local lib/ directory first, then resolves from installed platform optionalDependencies.
+ */
+export function getDefaultLibraryPath(preferMusl?: boolean): string {
+  const { filename, pkgName } = getPlatformPackage(preferMusl);
+
+  // 1. Try local lib/ directory (local development or git repository)
+  const localLib = resolve(import.meta.dir, "lib", filename);
+  if (existsSync(localLib)) {
+    return localLib;
+  }
+
+  // 2. Try resolving via optionalDependencies platform package
+  try {
+    const pkgLib = require.resolve(pkgName);
+    if (pkgLib && existsSync(pkgLib)) {
+      return pkgLib;
+    }
+  } catch {}
+
+  // 3. Fallback search in parent node_modules
+  try {
+    const fallback = resolve(import.meta.dir, "..", pkgName, filename);
+    if (existsSync(fallback)) {
+      return fallback;
+    }
+  } catch {}
+
+  throw new Error(
+    `Failed to locate BTDby4 native library for ${process.platform}-${process.arch}. ` +
+    `Expected platform package "${pkgName}" to be installed via optionalDependencies. ` +
+    `Ensure optionalDependencies are enabled or supply an explicit customPath to loadBTDby4().`
+  );
 }
 
 export interface BTDby4Instance {
