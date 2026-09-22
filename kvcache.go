@@ -82,6 +82,12 @@ type KvStats struct {
 	Branches   int64 `json:"branches"`
 	Tokens     int64 `json:"tokens"`
 	Bytes      int64 `json:"bytes"`
+	MaxBytes   int64 `json:"max_bytes"`
+	// AvailableBytes is MaxBytes - Bytes (clamped at zero): how much
+	// cache memory is still free before LRU eviction kicks in.
+	AvailableBytes int64 `json:"available_bytes"`
+	// TTLSeconds is the configured sliding TTL (KvInit, default 600).
+	TTLSeconds int64 `json:"ttl_seconds"`
 }
 
 // KvConfig reports the effective tunables (for kvInit echo / stats).
@@ -397,12 +403,19 @@ func KvStatsSnapshot() KvStats {
 	for _, ns := range kvStore {
 		branches += kvCountLeaves(ns.root)
 	}
+	avail := kvMaxBytes - kvTotalBytes
+	if avail < 0 {
+		avail = 0
+	}
 	return KvStats{
-		Namespaces: len(kvStore),
-		Nodes:      kvTotalNodes,
-		Branches:   branches,
-		Tokens:     kvTotalTokens,
-		Bytes:      kvTotalBytes,
+		Namespaces:     len(kvStore),
+		Nodes:          kvTotalNodes,
+		Branches:       branches,
+		Tokens:         kvTotalTokens,
+		Bytes:          kvTotalBytes,
+		MaxBytes:       kvMaxBytes,
+		AvailableBytes: avail,
+		TTLSeconds:     kvTTLMillis / 1000,
 	}
 }
 

@@ -52,6 +52,11 @@ export interface KvStats {
   branches: number;
   tokens: number;
   bytes: number;
+  max_bytes: number;
+  /** Free cache memory before LRU eviction kicks in. */
+  available_bytes: number;
+  /** Configured sliding TTL in seconds. */
+  ttl_seconds: number;
 }
 
 export interface KvConfig {
