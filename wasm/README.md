@@ -45,25 +45,31 @@ const btdby4 = await initBTDby4();
 const count = btdby4.countText("Hello world!");
 console.log(`Tokens: ${count}`); // 3
 
-// 2. OpenAI Chat Completion
-const chatBreakdown = btdby4.countChatRequest({
+// 2. OpenAI Chat Completion (accepts raw JSON string - zero double-conversion!)
+const chatPayload = JSON.stringify({
   system: "You are a helpful coding assistant.",
   messages: [
     { role: "user", content: "Write a high-performance token estimator." }
   ]
 });
+const chatBreakdown = btdby4.countChatRequest(chatPayload);
 console.log(`Chat Total: ${chatBreakdown.total}`);
 
-// 3. Anthropic Messages
-const anthropicBreakdown = btdby4.countAnthropicRequest({
+// 3. Anthropic Messages (accepts raw JSON string)
+const anthropicPayload = JSON.stringify({
   system: "You are Claude.",
   messages: [
     { role: "user", content: "Count my tokens!" }
   ]
 });
+const anthropicBreakdown = btdby4.countAnthropicRequest(anthropicPayload);
 console.log(`Anthropic Total: ${anthropicBreakdown.total}`);
 
-// 4. Encrypted Thinking Tokens (Claude 3.7 Sonnet)
+// 4. KV-Cache Prefix Simulation (Anthropic, OpenAI Chat, Responses)
+const kv = btdby4.kvCache(chatPayload, "chat", "my-app|gpt-4o|user-1");
+console.log(`Cached: ${kv.cached}, Fresh: ${kv.fresh}, Hit: ${kv.hit}`);
+
+// 5. Encrypted Thinking Tokens (Claude 3.7 Sonnet)
 const thinkingTokens = btdby4.estimateThinkingTokens("gAAAAABl-...");
 console.log(`Estimated Thinking Tokens: ${thinkingTokens}`);
 ```
