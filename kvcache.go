@@ -384,9 +384,15 @@ func KvLookup(raw []byte, protocol, namespace string, opts Options) (KvResult, e
 
 // KvStatsSnapshot returns a global snapshot (nodes/tokens/bytes are tracked
 // incrementally; branches are counted by traversal as leaf nodes).
+// It also runs the opportunistic maintenance (expiry sweep + memory-cap
+// eviction), so a 1-minute polling loop doubles as the janitor: idle
+// namespaces are collected even without traffic on them.
 func KvStatsSnapshot() KvStats {
 	kvMu.Lock()
 	defer kvMu.Unlock()
+	now := time.Now().UnixMilli()
+	kvSweepLocked(now)
+	kvEvictLocked()
 	var branches int64
 	for _, ns := range kvStore {
 		branches += kvCountLeaves(ns.root)
@@ -457,7 +463,7 @@ func kvSubtreeCounts(n *kvNode) (nodes, tokens, bytes int64) {
 	}
 	nodes = 1
 	tokens = int64(n.tokens)
-	bytes = kvNodeBytes
+	bytes = kvNodeBytes + 8
 	for _, ch := range n.children {
 		nn, tt, bb := kvSubtreeCounts(ch)
 		nodes += nn
