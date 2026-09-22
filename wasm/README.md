@@ -199,9 +199,9 @@ console.log(sim2);
 // -> { cached: 1250, fresh: 38, written: 38, hit: true, total: 1288 }
 // 🔥 1,250 tokens hit the cache! You save 90% on input costs!
 
-// 3. Inspect global cache telemetry:
+// 3. Inspect global cache telemetry & dashboard capacity (also cleans up expired entries automatically!):
 const stats = btdby4.kvStats();
-console.log(`Active Nodes: ${stats.nodes}, Memory: ${stats.bytesUsed / 1024 / 1024} MB, Hits: ${stats.hits}`);
+console.log(`Active Nodes: ${stats.nodes}, Memory Used: ${(stats.bytes / 1024 / 1024).toFixed(2)} MB, Available: ${(stats.available_bytes / 1024 / 1024).toFixed(2)} MB, TTL: ${stats.ttl_seconds}s`);
 ```
 
 ---
