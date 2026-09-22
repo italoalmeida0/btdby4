@@ -3,7 +3,8 @@
 One generic estimator for any LLM payload. BTDby4 scores a **complete
 request** — system, tools, text, images, visible thinking, encrypted
 thinking, tool I/O — with ~90% accuracy against **any provider or model**,
-in under a millisecond, with zero dependencies. No provider config, no
+in under a millisecond. One pure-Go JSON dependency (goccy/go-json,
+no CGO — it also builds for js/wasm). No provider config, no
 model tables, no per-API math: drop in any payload shape and get a
 breakdown you can enforce budgets, compaction and routing on.
 
@@ -27,7 +28,7 @@ whole-payload estimator:
 | Protocols | ✅ Anthropic + Chat + Responses | ❌ OpenAI text | ❌ OpenAI text |
 | Images | ✅ 28px-tile model | ❌ | ❌ |
 | Encrypted thinking | ✅ auto-estimated | ❌ invisible | ❌ invisible |
-| Offline, zero-dep | ✅ | ⚠️ downloads BPE on first use | ✅ |
+| Offline, pure Go | ✅ | ⚠️ downloads BPE on first use | ✅ |
 
 ### Large-context latency (windows/arm64, p50)
 
@@ -145,7 +146,7 @@ configure.
 
 ## API Reference
 
-All counters take an `Options` value (today just `IgnoreImages`) and
+All counters take an `Options` value (`Tight`, `IgnoreImages`) and
 return `(Breakdown, error)` for requests/messages/parts or `(int, error)`
 for text/tools. `*JSON` variants accept raw `[]byte` instead of structs.
 Images-only helpers never fail and return a plain `int`.
@@ -186,11 +187,6 @@ mb, _ := btdby4.CountAnthropicMessage(
 )
 fmt.Println(mb.Tokens) // 2
 ```
-
-Legacy aliases (kept for compatibility, prefer the `Anthropic*` names):
-`Request`, `Message`, `Tool`, `CountRequest`, `CountRequestJSON`,
-`CountMessage`, `CountMessageJSON`, `CountBlock`, `CountBlockJSON`,
-`CountTool`, `CountToolJSON`.
 
 ### OpenAI Chat Completions
 
@@ -317,48 +313,42 @@ provider shapes (median error ~5%).
 |---|---|---|
 | `EstimateThinkingTokens` | `EstimateThinkingTokens(enc string) int` | Automatic estimate for one envelope (empty → 0). |
 
-## 🥟 Bun & JavaScript Bindings (`bun:ffi`)
+## 🌐 WebAssembly Bindings (`btdby4-wasm`)
 
-BTDby4 provides official native bindings for [Bun](https://bun.sh) via `bun:ffi` located in [`bun/`](./bun), delivering Go-level performance directly to TypeScript and JavaScript runtimes with **zero npm dependencies**.
+BTDby4 ships a universal WebAssembly package in [`wasm/`](./wasm) (`btdby4-wasm`): the same Go estimator compiled to WASM, running in Node.js, Deno and browsers with zero native dependencies.
 
-Pre-compiled dynamic libraries are included for **all 8 major platforms and environments**:
-- **Windows**: `x64` (amd64), `arm64`
-- **Linux glibc**: `x64` (amd64), `arm64` (Ubuntu, Debian, Fedora, Arch)
-- **Linux musl**: `x64` (amd64), `arm64` (Alpine Linux, minimal Docker images)
-- **macOS**: `Apple Silicon` (arm64), `Intel` (x64)
-
-The TypeScript wrapper automatically detects the OS, CPU architecture, and whether the system runs **glibc** or **musl**, loading the correct binary without any manual configuration.
+All payload APIs take the raw JSON string (the request body as-is) — no object round-trip:
 
 ```typescript
-import btdby4 from "./bun";
+import initBTDby4 from "btdby4-wasm";
 
-const estimator = btdby4();
+const btdby4 = await initBTDby4();
 
-// 1. Text token counting (~1µs)
-console.log(estimator.countText("Hello, world!")); // 2
+// 1. Text token counting
+console.log(btdby4.countText("Hello, world!")); // 2
 
-// 2. Whole OpenAI Chat completions request (~50µs)
-const total = estimator.countChatTotal({
+// 2. Whole OpenAI Chat completions request — pass the body straight through
+const total = btdby4.countChatTotal(JSON.stringify({
   model: "gpt-4o",
   messages: [
     { role: "system", content: "You are a helpful assistant." },
     { role: "user", content: "Hello!" }
   ]
-});
+}));
 ```
 
-### Bun FFI Performance vs JavaScript (`tokenx`)
+For complete documentation, see [`wasm/README.md`](./wasm/README.md).
 
-Benchmark results on a real **8.3 MB conversation session (~700K tokens across 2,626 messages)** comparing native `btdby4` (`bun:ffi`) against the pure JavaScript [`tokenx`](https://www.npmjs.com/package/tokenx) package:
+### KV-cache simulation (`kvInit` / `kvCache` / `kvStats` / `kvClear`)
 
-| Scenario | Payload Size | `tokenx` (JavaScript) | `btdby4` (Bun FFI) | Speedup Multiplier |
-|---|---|---|---|---|
-| **Structured Chat Request** | 2,626 messages (~650k tokens) | ~220 ms (11.9k msg/s) | **~59 ms (44.4k msg/s)** | **~2.9x – 4.4x faster** |
-| **Pure Conversation Text** | 1.75 MB pure text (~613k tokens) | ~182 ms (9.6 MB/s) | **~29 ms (59.8 MB/s)** | **~5.8x – 6.2x faster** |
-| **Full Session JSONL File** | 8.3 MB raw file (~2.98M tokens) | ~825 ms (9.6 MB/s) | **~144 ms (54.8 MB/s)** | **~5.7x – 6.0x faster** |
-| **Micro-Call Latency** | 50,000 iterations | ~10.5 µs/call | **~1.14 µs/call (~875k ops/s)** | **~9.2x faster** |
-
-For complete documentation on all 18 exported functions and detailed options, see [`bun/README.md`](./bun/README.md).
+The WASM package also ships a prefix-cache simulator for gateways:
+pass the raw request body + protocol + namespace
+(`"provider|model|api-key"`) and get `cached` / `fresh` / `written`
+token counts even when the provider does not report cached input.
+One prefix trie per protocol+namespace, sliding TTL (default 600s)
+and a memory cap (default 400MB) with automatic LRU — all tunable
+via `kvInit`. See the KV-Cache Provider section in
+[`wasm/README.md`](./wasm/README.md).
 
 ## Install
 
@@ -366,7 +356,7 @@ For complete documentation on all 18 exported functions and detailed options, se
 go get github.com/italoalmeida0/btdby4
 ```
 
-Requires Go 1.18+. No external dependencies. Builds on
+Requires Go 1.18+. One dependency (goccy/go-json, pure Go). Builds on
 windows/linux/darwin × amd64/arm64.
 
 ## How it works

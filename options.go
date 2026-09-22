@@ -115,10 +115,6 @@ type Options struct {
 	// Tight disables the built-in safety margin and returns the
 	// closest point estimate. Default (false) keeps the margin.
 	Tight bool
-	// Conservative is deprecated and has no effect: the safety margin
-	// is now the default. Kept for compatibility; use Tight: true to
-	// opt out of it.
-	Conservative bool
 }
 
 func estimateImageURLTokens() int {

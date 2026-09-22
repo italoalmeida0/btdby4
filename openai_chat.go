@@ -1,7 +1,7 @@
 package btdby4
 
 import (
-	"encoding/json"
+	json "github.com/goccy/go-json"
 	"runtime"
 	"sync"
 
@@ -46,6 +46,8 @@ type ChatRequest struct {
 }
 
 // CountChatRequest counts a full Chat Completions request.
+// NOTE: chat hot path is fused in kvCountChatRequest (single walk);
+// this stays for struct-based callers.
 func CountChatRequest(req ChatRequest, opts Options) (Breakdown, error) {
 	var out Breakdown
 	if req.System != nil {
@@ -86,12 +88,16 @@ func CountChatRequest(req ChatRequest, opts Options) (Breakdown, error) {
 }
 
 // CountChatRequestJSON counts a full request from raw JSON.
+// The request is decoded once and then counted + linearized in a
+// single walk (kvCountChatRequest) shared with the KV cache path:
+// KvLookup reuses this so a gateway call pays one parse, not two.
 func CountChatRequestJSON(raw []byte, opts Options) (Breakdown, error) {
 	var req ChatRequest
-	if err := json.Unmarshal(raw, &req); err != nil {
+	if err := json.UnmarshalNoEscape(raw, &req); err != nil {
 		return Breakdown{}, err
 	}
-	return CountChatRequest(req, opts)
+	bd, _, err := kvCountChatRequest(req, opts)
+	return bd, err
 }
 
 // CountChatMessage counts a single message.
@@ -111,7 +117,7 @@ func CountChatMessage(msg ChatMessage, opts Options) (BlockBreakdown, error) {
 // CountChatMessageJSON counts a single message from raw JSON.
 func CountChatMessageJSON(raw []byte, opts Options) (BlockBreakdown, error) {
 	var msg ChatMessage
-	if err := json.Unmarshal(raw, &msg); err != nil {
+	if err := json.UnmarshalNoEscape(raw, &msg); err != nil {
 		return BlockBreakdown{}, err
 	}
 	return CountChatMessage(msg, opts)
@@ -136,7 +142,7 @@ func CountChatPart(part map[string]any, opts Options) (BlockBreakdown, error) {
 // CountChatPartJSON counts a single content part from raw JSON.
 func CountChatPartJSON(raw []byte, opts Options) (BlockBreakdown, error) {
 	var part map[string]any
-	if err := json.Unmarshal(raw, &part); err != nil {
+	if err := json.UnmarshalNoEscape(raw, &part); err != nil {
 		return BlockBreakdown{}, err
 	}
 	return CountChatPart(part, opts)
@@ -150,7 +156,7 @@ func CountChatTool(tool ChatTool) (int, error) {
 // CountChatToolJSON counts a tool definition from raw JSON.
 func CountChatToolJSON(raw []byte) (int, error) {
 	var tool ChatTool
-	if err := json.Unmarshal(raw, &tool); err != nil {
+	if err := json.UnmarshalNoEscape(raw, &tool); err != nil {
 		return 0, err
 	}
 	return countChatTool(tool)

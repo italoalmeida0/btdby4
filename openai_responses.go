@@ -1,7 +1,7 @@
 package btdby4
 
 import (
-	"encoding/json"
+	json "github.com/goccy/go-json"
 
 	"github.com/italoalmeida0/btdby4/codec"
 )
@@ -67,12 +67,15 @@ func CountResponsesRequest(req ResponsesRequest, opts Options) (Breakdown, error
 }
 
 // CountResponsesRequestJSON counts a full request from raw JSON.
+// The request is decoded once and then counted + linearized in a
+// single walk (kvCountResponsesRequest) shared with the KV cache path.
 func CountResponsesRequestJSON(raw []byte, opts Options) (Breakdown, error) {
 	var req ResponsesRequest
-	if err := json.Unmarshal(raw, &req); err != nil {
+	if err := json.UnmarshalNoEscape(raw, &req); err != nil {
 		return Breakdown{}, err
 	}
-	return CountResponsesRequest(req, opts)
+	bd, _, err := kvCountResponsesRequest(req, opts)
+	return bd, err
 }
 
 // CountResponsesItem counts a single input item.
@@ -89,7 +92,7 @@ func CountResponsesItem(item map[string]any, opts Options) (BlockBreakdown, erro
 // CountResponsesItemJSON counts a single input item from raw JSON.
 func CountResponsesItemJSON(raw []byte, opts Options) (BlockBreakdown, error) {
 	var item map[string]any
-	if err := json.Unmarshal(raw, &item); err != nil {
+	if err := json.UnmarshalNoEscape(raw, &item); err != nil {
 		return BlockBreakdown{}, err
 	}
 	return CountResponsesItem(item, opts)
@@ -109,7 +112,7 @@ func CountResponsesPart(part map[string]any, opts Options) (BlockBreakdown, erro
 // CountResponsesPartJSON counts a single content part from raw JSON.
 func CountResponsesPartJSON(raw []byte, opts Options) (BlockBreakdown, error) {
 	var part map[string]any
-	if err := json.Unmarshal(raw, &part); err != nil {
+	if err := json.UnmarshalNoEscape(raw, &part); err != nil {
 		return BlockBreakdown{}, err
 	}
 	return CountResponsesPart(part, opts)
@@ -123,7 +126,7 @@ func CountResponsesTool(tool ResponsesTool) (int, error) {
 // CountResponsesToolJSON counts a tool definition from raw JSON.
 func CountResponsesToolJSON(raw []byte) (int, error) {
 	var tool ResponsesTool
-	if err := json.Unmarshal(raw, &tool); err != nil {
+	if err := json.UnmarshalNoEscape(raw, &tool); err != nil {
 		return 0, err
 	}
 	return countResponsesTool(tool)

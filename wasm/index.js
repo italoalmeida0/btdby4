@@ -631,106 +631,94 @@ async function initBTDby4(wasmSource) {
         return wasm.countImageBytes(u8);
       },
       countChatRequest(request, options) {
-        const str = JSON.stringify(request);
-        const res = wasm.countChatRequestJSON(str, !!options?.tight, !!options?.ignoreImages);
+        const res = wasm.countChatRequestJSON(request, !!options?.tight, !!options?.ignoreImages);
         return parseResult(res);
       },
       countChatTotal(request, options) {
-        const str = JSON.stringify(request);
-        const res = wasm.countChatTotalQuick(str, !!options?.tight, !!options?.ignoreImages);
+        const res = wasm.countChatTotalQuick(request, !!options?.tight, !!options?.ignoreImages);
         if (res < 0) {
           throw new Error("BTDby4 error: failed to count chat request total");
         }
         return res;
       },
       countChatMessage(message, options) {
-        const str = JSON.stringify(message);
-        const res = wasm.countChatMessageJSON(str, !!options?.tight, !!options?.ignoreImages);
+        const res = wasm.countChatMessageJSON(message, !!options?.tight, !!options?.ignoreImages);
         return parseResult(res);
       },
       countChatPart(part, options) {
-        const str = JSON.stringify(part);
-        const res = wasm.countChatPartJSON(str, !!options?.tight, !!options?.ignoreImages);
+        const res = wasm.countChatPartJSON(part, !!options?.tight, !!options?.ignoreImages);
         return parseResult(res);
       },
       countChatTool(tool) {
-        const str = JSON.stringify(tool);
-        const res = wasm.countChatToolJSON(str);
+        const res = wasm.countChatToolJSON(tool);
         if (res < 0)
           throw new Error("BTDby4 error: failed to count chat tool");
         return res;
       },
       countAnthropicRequest(request, options) {
-        const str = JSON.stringify(request);
-        const res = wasm.countAnthropicRequestJSON(str, !!options?.tight, !!options?.ignoreImages);
+        const res = wasm.countAnthropicRequestJSON(request, !!options?.tight, !!options?.ignoreImages);
         return parseResult(res);
       },
       countAnthropicTotal(request, options) {
-        const str = JSON.stringify(request);
-        const res = wasm.countAnthropicTotalQuick(str, !!options?.tight, !!options?.ignoreImages);
+        const res = wasm.countAnthropicTotalQuick(request, !!options?.tight, !!options?.ignoreImages);
         if (res < 0) {
           throw new Error("BTDby4 error: failed to count anthropic request total");
         }
         return res;
       },
       countAnthropicMessage(message, options) {
-        const str = JSON.stringify(message);
-        const res = wasm.countAnthropicMessageJSON(str, !!options?.tight, !!options?.ignoreImages);
+        const res = wasm.countAnthropicMessageJSON(message, !!options?.tight, !!options?.ignoreImages);
         return parseResult(res);
       },
       countAnthropicBlock(block, options) {
-        const str = JSON.stringify(block);
-        const res = wasm.countAnthropicBlockJSON(str, !!options?.tight, !!options?.ignoreImages);
+        const res = wasm.countAnthropicBlockJSON(block, !!options?.tight, !!options?.ignoreImages);
         return parseResult(res);
       },
       countAnthropicTool(tool) {
-        const str = JSON.stringify(tool);
-        const res = wasm.countAnthropicToolJSON(str);
+        const res = wasm.countAnthropicToolJSON(tool);
         if (res < 0)
           throw new Error("BTDby4 error: failed to count anthropic tool");
         return res;
       },
-      countRequest(request, options) {
-        return this.countAnthropicRequest(request, options);
-      },
-      countMessage(message, options) {
-        return this.countAnthropicMessage(message, options);
-      },
-      countBlock(block, options) {
-        return this.countAnthropicBlock(block, options);
-      },
-      countTool(tool) {
-        return this.countAnthropicTool(tool);
-      },
       countResponsesRequest(request, options) {
-        const str = JSON.stringify(request);
-        const res = wasm.countResponsesRequestJSON(str, !!options?.tight, !!options?.ignoreImages);
+        const res = wasm.countResponsesRequestJSON(request, !!options?.tight, !!options?.ignoreImages);
         return parseResult(res);
       },
       countResponsesTotal(request, options) {
-        const str = JSON.stringify(request);
-        const res = wasm.countResponsesTotalQuick(str, !!options?.tight, !!options?.ignoreImages);
+        const res = wasm.countResponsesTotalQuick(request, !!options?.tight, !!options?.ignoreImages);
         if (res < 0) {
           throw new Error("BTDby4 error: failed to count responses request total");
         }
         return res;
       },
       countResponsesItem(item, options) {
-        const str = JSON.stringify(item);
-        const res = wasm.countResponsesItemJSON(str, !!options?.tight, !!options?.ignoreImages);
+        const res = wasm.countResponsesItemJSON(item, !!options?.tight, !!options?.ignoreImages);
         return parseResult(res);
       },
       countResponsesPart(part, options) {
-        const str = JSON.stringify(part);
-        const res = wasm.countResponsesPartJSON(str, !!options?.tight, !!options?.ignoreImages);
+        const res = wasm.countResponsesPartJSON(part, !!options?.tight, !!options?.ignoreImages);
         return parseResult(res);
       },
       countResponsesTool(tool) {
-        const str = JSON.stringify(tool);
-        const res = wasm.countResponsesToolJSON(str);
+        const res = wasm.countResponsesToolJSON(tool);
         if (res < 0)
           throw new Error("BTDby4 error: failed to count responses tool");
         return res;
+      },
+      kvCache(request, protocol, namespace, options) {
+        const res = wasm.kvCacheJSON(request, protocol, namespace, !!options?.tight, !!options?.ignoreImages);
+        return parseResult(res);
+      },
+      kvStats() {
+        const res = wasm.kvStatsJSON();
+        return parseResult(res);
+      },
+      kvInit(options) {
+        const res = wasm.kvInit(options?.ttlSeconds ?? 0, options?.maxMB ?? 0, options?.separateProtocol ?? true);
+        return parseResult(res);
+      },
+      kvClear(namespace) {
+        wasm.kvClear(namespace ?? "");
       }
     };
     cachedInstance = instance;

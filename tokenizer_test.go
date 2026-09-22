@@ -1,7 +1,7 @@
 package btdby4_test
 
 import (
-	"encoding/json"
+	json "github.com/goccy/go-json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -556,24 +556,6 @@ func TestFullPayloadParity(t *testing.T) {
 		t.Errorf("responses full: thinking missing in %+v", r)
 	}
 
-	// Legacy aliases keep working.
-	legacyReq := btdby4.Request{Messages: []btdby4.Message{{Role: "user", Content: "hello world"}}}
-	if out, err := btdby4.CountRequest(legacyReq, btdby4.Options{}); err != nil || out.Messages != 2 {
-		t.Errorf("legacy CountRequest: got %+v err %v", out, err)
-	}
-	if _, err := btdby4.CountRequestJSON([]byte(`{"messages":[{"role":"user","content":"hello world"}]}`), btdby4.Options{}); err != nil {
-		t.Errorf("legacy CountRequestJSON: %v", err)
-	}
-	if _, err := btdby4.CountMessage(btdby4.Message{Role: "user", Content: "hi"}, btdby4.Options{}); err != nil {
-		t.Errorf("legacy CountMessage: %v", err)
-	}
-	if _, err := btdby4.CountBlock(map[string]any{"type": "text", "text": "hi"}, btdby4.Options{}); err != nil {
-		t.Errorf("legacy CountBlock: %v", err)
-	}
-	if _, err := btdby4.CountTool(btdby4.Tool{Name: "x"}); err != nil {
-		t.Errorf("legacy CountTool: %v", err)
-	}
-
 	// Anthropic granularities.
 	msg := btdby4.AnthropicMessage{Role: "user", Content: "hello world"}
 	if mb, err := btdby4.CountAnthropicMessage(msg, btdby4.Options{}); err != nil || mb.Tokens != 2 {
@@ -664,14 +646,6 @@ func TestConservativeIsUpperBound(t *testing.T) {
 	}
 	if safe.Total <= tight.Total {
 		t.Errorf("default total %d should exceed tight %d", safe.Total, tight.Total)
-	}
-	// Conservative: true is a no-op alias of the default.
-	legacy, err := btdby4.CountChatRequest(chat, btdby4.Options{Conservative: true})
-	if err != nil {
-		t.Fatalf("legacy flag: %v", err)
-	}
-	if legacy.Total != safe.Total {
-		t.Errorf("Conservative: true = %d, want default %d", legacy.Total, safe.Total)
 	}
 
 	// No tools, no images: margin is just per-message.

@@ -32,6 +32,43 @@ export interface Options {
   ignoreImages?: boolean;
 }
 
+export type KvProtocol = "anthropic" | "chat" | "responses";
+
+export interface KvResult {
+  total: number;
+  cached: number;
+  fresh: number;
+  written: number;
+  hit: boolean;
+  hit_ratio: number;
+  prefix_blocks: number;
+  total_blocks: number;
+  breakdown: Breakdown;
+}
+
+export interface KvStats {
+  namespaces: number;
+  nodes: number;
+  branches: number;
+  tokens: number;
+  bytes: number;
+}
+
+export interface KvConfig {
+  ttl_seconds: number;
+  max_mb: number;
+  separate_protocol: boolean;
+}
+
+export interface KvInitOptions {
+  /** TTL in seconds. Default 600 (10min). 0/omitted = default. */
+  ttlSeconds?: number;
+  /** Memory limit in MB. Default 400. 0/omitted = default. */
+  maxMB?: number;
+  /** Key by protocol+namespace (default true). false = namespace only. */
+  separateProtocol?: boolean;
+}
+
 export interface BTDby4Instance {
   // --- Text & Reasoning ---
   countText(text: string): number;
@@ -43,31 +80,31 @@ export interface BTDby4Instance {
   countImageBytes(bytes: Uint8Array | ArrayBuffer): number;
 
   // --- OpenAI Chat Completions ---
-  countChatRequest(request: object, options?: Options): Breakdown;
-  countChatTotal(request: object, options?: Options): number;
-  countChatMessage(message: object, options?: Options): BlockBreakdown;
-  countChatPart(part: object, options?: Options): BlockBreakdown;
-  countChatTool(tool: object): number;
+  countChatRequest(request: string, options?: Options): Breakdown;
+  countChatTotal(request: string, options?: Options): number;
+  countChatMessage(message: string, options?: Options): BlockBreakdown;
+  countChatPart(part: string, options?: Options): BlockBreakdown;
+  countChatTool(tool: string): number;
 
   // --- Anthropic Messages ---
-  countAnthropicRequest(request: object, options?: Options): Breakdown;
-  countAnthropicTotal(request: object, options?: Options): number;
-  countAnthropicMessage(message: object, options?: Options): BlockBreakdown;
-  countAnthropicBlock(block: object, options?: Options): BlockBreakdown;
-  countAnthropicTool(tool: object): number;
-
-  // --- Legacy Aliases for Anthropic ---
-  countRequest(request: object, options?: Options): Breakdown;
-  countMessage(message: object, options?: Options): BlockBreakdown;
-  countBlock(block: object, options?: Options): BlockBreakdown;
-  countTool(tool: object): number;
+  countAnthropicRequest(request: string, options?: Options): Breakdown;
+  countAnthropicTotal(request: string, options?: Options): number;
+  countAnthropicMessage(message: string, options?: Options): BlockBreakdown;
+  countAnthropicBlock(block: string, options?: Options): BlockBreakdown;
+  countAnthropicTool(tool: string): number;
 
   // --- OpenAI Responses ---
-  countResponsesRequest(request: object, options?: Options): Breakdown;
-  countResponsesTotal(request: object, options?: Options): number;
-  countResponsesItem(item: object, options?: Options): BlockBreakdown;
-  countResponsesPart(part: object, options?: Options): BlockBreakdown;
-  countResponsesTool(tool: object): number;
+  countResponsesRequest(request: string, options?: Options): Breakdown;
+  countResponsesTotal(request: string, options?: Options): number;
+  countResponsesItem(item: string, options?: Options): BlockBreakdown;
+  countResponsesPart(part: string, options?: Options): BlockBreakdown;
+  countResponsesTool(tool: string): number;
+
+  // --- KV-Cache provider (prefix simulation) ---
+  kvCache(request: string, protocol: KvProtocol, namespace: string, options?: Options): KvResult;
+  kvStats(): KvStats;
+  kvInit(options?: KvInitOptions): KvConfig;
+  kvClear(namespace?: string): void;
 }
 
 let cachedInstance: BTDby4Instance | null = null;
@@ -92,7 +129,7 @@ export async function initBTDby4(wasmSource?: WasmSource): Promise<BTDby4Instanc
     let bytes: BufferSource;
 
     if (!wasmSource) {
-      if (typeof process !== "undefined" && process.versions && (process.versions.node || process.versions.bun)) {
+      if (typeof process !== "undefined" && process.versions && (process.versions.node || (process.versions as any).bun)) {
         const { readFileSync } = await import("fs");
         const wasmUrl = new URL("btdby4.wasm", import.meta.url);
         bytes = readFileSync(wasmUrl);
@@ -108,7 +145,7 @@ export async function initBTDby4(wasmSource?: WasmSource): Promise<BTDby4Instanc
       bytes = await wasmSource.arrayBuffer();
     } else if (typeof wasmSource === "string" || wasmSource instanceof URL) {
       const urlStr = wasmSource.toString();
-      if (typeof process !== "undefined" && process.versions && (process.versions.node || process.versions.bun) && !urlStr.startsWith("http://") && !urlStr.startsWith("https://")) {
+      if (typeof process !== "undefined" && process.versions && (process.versions.node || (process.versions as any).bun) && !urlStr.startsWith("http://") && !urlStr.startsWith("https://")) {
         const { readFileSync } = await import("fs");
         bytes = readFileSync(urlStr);
       } else {
@@ -164,122 +201,110 @@ export async function initBTDby4(wasmSource?: WasmSource): Promise<BTDby4Instanc
         return wasm.countImageBytes(u8);
       },
 
-      countChatRequest(request: object, options?: Options): Breakdown {
-        const str = JSON.stringify(request);
-        const res = wasm.countChatRequestJSON(str, !!options?.tight, !!options?.ignoreImages);
+      countChatRequest(request: string, options?: Options): Breakdown {
+        const res = wasm.countChatRequestJSON(request, !!options?.tight, !!options?.ignoreImages);
         return parseResult<Breakdown>(res);
       },
 
-      countChatTotal(request: object, options?: Options): number {
-        const str = JSON.stringify(request);
-        const res = wasm.countChatTotalQuick(str, !!options?.tight, !!options?.ignoreImages);
+      countChatTotal(request: string, options?: Options): number {
+        const res = wasm.countChatTotalQuick(request, !!options?.tight, !!options?.ignoreImages);
         if (res < 0) {
           throw new Error("BTDby4 error: failed to count chat request total");
         }
         return res;
       },
 
-      countChatMessage(message: object, options?: Options): BlockBreakdown {
-        const str = JSON.stringify(message);
-        const res = wasm.countChatMessageJSON(str, !!options?.tight, !!options?.ignoreImages);
+      countChatMessage(message: string, options?: Options): BlockBreakdown {
+        const res = wasm.countChatMessageJSON(message, !!options?.tight, !!options?.ignoreImages);
         return parseResult<BlockBreakdown>(res);
       },
 
-      countChatPart(part: object, options?: Options): BlockBreakdown {
-        const str = JSON.stringify(part);
-        const res = wasm.countChatPartJSON(str, !!options?.tight, !!options?.ignoreImages);
+      countChatPart(part: string, options?: Options): BlockBreakdown {
+        const res = wasm.countChatPartJSON(part, !!options?.tight, !!options?.ignoreImages);
         return parseResult<BlockBreakdown>(res);
       },
 
-      countChatTool(tool: object): number {
-        const str = JSON.stringify(tool);
-        const res = wasm.countChatToolJSON(str);
+      countChatTool(tool: string): number {
+        const res = wasm.countChatToolJSON(tool);
         if (res < 0) throw new Error("BTDby4 error: failed to count chat tool");
         return res;
       },
 
-      countAnthropicRequest(request: object, options?: Options): Breakdown {
-        const str = JSON.stringify(request);
-        const res = wasm.countAnthropicRequestJSON(str, !!options?.tight, !!options?.ignoreImages);
+      countAnthropicRequest(request: string, options?: Options): Breakdown {
+        const res = wasm.countAnthropicRequestJSON(request, !!options?.tight, !!options?.ignoreImages);
         return parseResult<Breakdown>(res);
       },
 
-      countAnthropicTotal(request: object, options?: Options): number {
-        const str = JSON.stringify(request);
-        const res = wasm.countAnthropicTotalQuick(str, !!options?.tight, !!options?.ignoreImages);
+      countAnthropicTotal(request: string, options?: Options): number {
+        const res = wasm.countAnthropicTotalQuick(request, !!options?.tight, !!options?.ignoreImages);
         if (res < 0) {
           throw new Error("BTDby4 error: failed to count anthropic request total");
         }
         return res;
       },
 
-      countAnthropicMessage(message: object, options?: Options): BlockBreakdown {
-        const str = JSON.stringify(message);
-        const res = wasm.countAnthropicMessageJSON(str, !!options?.tight, !!options?.ignoreImages);
+      countAnthropicMessage(message: string, options?: Options): BlockBreakdown {
+        const res = wasm.countAnthropicMessageJSON(message, !!options?.tight, !!options?.ignoreImages);
         return parseResult<BlockBreakdown>(res);
       },
 
-      countAnthropicBlock(block: object, options?: Options): BlockBreakdown {
-        const str = JSON.stringify(block);
-        const res = wasm.countAnthropicBlockJSON(str, !!options?.tight, !!options?.ignoreImages);
+      countAnthropicBlock(block: string, options?: Options): BlockBreakdown {
+        const res = wasm.countAnthropicBlockJSON(block, !!options?.tight, !!options?.ignoreImages);
         return parseResult<BlockBreakdown>(res);
       },
 
-      countAnthropicTool(tool: object): number {
-        const str = JSON.stringify(tool);
-        const res = wasm.countAnthropicToolJSON(str);
+      countAnthropicTool(tool: string): number {
+        const res = wasm.countAnthropicToolJSON(tool);
         if (res < 0) throw new Error("BTDby4 error: failed to count anthropic tool");
         return res;
       },
 
-      countRequest(request: object, options?: Options): Breakdown {
-        return this.countAnthropicRequest(request, options);
-      },
-
-      countMessage(message: object, options?: Options): BlockBreakdown {
-        return this.countAnthropicMessage(message, options);
-      },
-
-      countBlock(block: object, options?: Options): BlockBreakdown {
-        return this.countAnthropicBlock(block, options);
-      },
-
-      countTool(tool: object): number {
-        return this.countAnthropicTool(tool);
-      },
-
-      countResponsesRequest(request: object, options?: Options): Breakdown {
-        const str = JSON.stringify(request);
-        const res = wasm.countResponsesRequestJSON(str, !!options?.tight, !!options?.ignoreImages);
+      countResponsesRequest(request: string, options?: Options): Breakdown {
+        const res = wasm.countResponsesRequestJSON(request, !!options?.tight, !!options?.ignoreImages);
         return parseResult<Breakdown>(res);
       },
 
-      countResponsesTotal(request: object, options?: Options): number {
-        const str = JSON.stringify(request);
-        const res = wasm.countResponsesTotalQuick(str, !!options?.tight, !!options?.ignoreImages);
+      countResponsesTotal(request: string, options?: Options): number {
+        const res = wasm.countResponsesTotalQuick(request, !!options?.tight, !!options?.ignoreImages);
         if (res < 0) {
           throw new Error("BTDby4 error: failed to count responses request total");
         }
         return res;
       },
 
-      countResponsesItem(item: object, options?: Options): BlockBreakdown {
-        const str = JSON.stringify(item);
-        const res = wasm.countResponsesItemJSON(str, !!options?.tight, !!options?.ignoreImages);
+      countResponsesItem(item: string, options?: Options): BlockBreakdown {
+        const res = wasm.countResponsesItemJSON(item, !!options?.tight, !!options?.ignoreImages);
         return parseResult<BlockBreakdown>(res);
       },
 
-      countResponsesPart(part: object, options?: Options): BlockBreakdown {
-        const str = JSON.stringify(part);
-        const res = wasm.countResponsesPartJSON(str, !!options?.tight, !!options?.ignoreImages);
+      countResponsesPart(part: string, options?: Options): BlockBreakdown {
+        const res = wasm.countResponsesPartJSON(part, !!options?.tight, !!options?.ignoreImages);
         return parseResult<BlockBreakdown>(res);
       },
 
-      countResponsesTool(tool: object): number {
-        const str = JSON.stringify(tool);
-        const res = wasm.countResponsesToolJSON(str);
+      countResponsesTool(tool: string): number {
+        const res = wasm.countResponsesToolJSON(tool);
         if (res < 0) throw new Error("BTDby4 error: failed to count responses tool");
         return res;
+      },
+
+      kvCache(request: string, protocol: KvProtocol, namespace: string, options?: Options): KvResult {
+        const res = wasm.kvCacheJSON(request, protocol, namespace, !!options?.tight, !!options?.ignoreImages);
+        return parseResult<KvResult>(res);
+      },
+
+      kvStats(): KvStats {
+        const res = wasm.kvStatsJSON();
+        return parseResult<KvStats>(res);
+      },
+
+      kvInit(options?: KvInitOptions): KvConfig {
+        const res = wasm.kvInit(options?.ttlSeconds ?? 0, options?.maxMB ?? 0, options?.separateProtocol ?? true);
+        return parseResult<KvConfig>(res);
+      },
+
+      kvClear(namespace?: string): void {
+        wasm.kvClear(namespace ?? "");
       },
     };
 

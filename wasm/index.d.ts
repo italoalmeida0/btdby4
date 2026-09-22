@@ -22,6 +22,43 @@ export interface Options {
   ignoreImages?: boolean;
 }
 
+export type KvProtocol = "anthropic" | "chat" | "responses";
+
+export interface KvResult {
+  total: number;
+  cached: number;
+  fresh: number;
+  written: number;
+  hit: boolean;
+  hit_ratio: number;
+  prefix_blocks: number;
+  total_blocks: number;
+  breakdown: Breakdown;
+}
+
+export interface KvStats {
+  namespaces: number;
+  nodes: number;
+  branches: number;
+  tokens: number;
+  bytes: number;
+}
+
+export interface KvConfig {
+  ttl_seconds: number;
+  max_mb: number;
+  separate_protocol: boolean;
+}
+
+export interface KvInitOptions {
+  /** TTL in seconds. Default 600 (10min). 0/omitted = default. */
+  ttlSeconds?: number;
+  /** Memory limit in MB. Default 400. 0/omitted = default. */
+  maxMB?: number;
+  /** Key by protocol+namespace (default true). false = namespace only. */
+  separateProtocol?: boolean;
+}
+
 export interface BTDby4Instance {
   // --- Text & Reasoning ---
   countText(text: string): number;
@@ -33,31 +70,31 @@ export interface BTDby4Instance {
   countImageBytes(bytes: Uint8Array | ArrayBuffer): number;
 
   // --- OpenAI Chat Completions ---
-  countChatRequest(request: object, options?: Options): Breakdown;
-  countChatTotal(request: object, options?: Options): number;
-  countChatMessage(message: object, options?: Options): BlockBreakdown;
-  countChatPart(part: object, options?: Options): BlockBreakdown;
-  countChatTool(tool: object): number;
+  countChatRequest(request: string, options?: Options): Breakdown;
+  countChatTotal(request: string, options?: Options): number;
+  countChatMessage(message: string, options?: Options): BlockBreakdown;
+  countChatPart(part: string, options?: Options): BlockBreakdown;
+  countChatTool(tool: string): number;
 
   // --- Anthropic Messages ---
-  countAnthropicRequest(request: object, options?: Options): Breakdown;
-  countAnthropicTotal(request: object, options?: Options): number;
-  countAnthropicMessage(message: object, options?: Options): BlockBreakdown;
-  countAnthropicBlock(block: object, options?: Options): BlockBreakdown;
-  countAnthropicTool(tool: object): number;
-
-  // --- Legacy Aliases for Anthropic ---
-  countRequest(request: object, options?: Options): Breakdown;
-  countMessage(message: object, options?: Options): BlockBreakdown;
-  countBlock(block: object, options?: Options): BlockBreakdown;
-  countTool(tool: object): number;
+  countAnthropicRequest(request: string, options?: Options): Breakdown;
+  countAnthropicTotal(request: string, options?: Options): number;
+  countAnthropicMessage(message: string, options?: Options): BlockBreakdown;
+  countAnthropicBlock(block: string, options?: Options): BlockBreakdown;
+  countAnthropicTool(tool: string): number;
 
   // --- OpenAI Responses ---
-  countResponsesRequest(request: object, options?: Options): Breakdown;
-  countResponsesTotal(request: object, options?: Options): number;
-  countResponsesItem(item: object, options?: Options): BlockBreakdown;
-  countResponsesPart(part: object, options?: Options): BlockBreakdown;
-  countResponsesTool(tool: object): number;
+  countResponsesRequest(request: string, options?: Options): Breakdown;
+  countResponsesTotal(request: string, options?: Options): number;
+  countResponsesItem(item: string, options?: Options): BlockBreakdown;
+  countResponsesPart(part: string, options?: Options): BlockBreakdown;
+  countResponsesTool(tool: string): number;
+
+  // --- KV-Cache provider (prefix simulation) ---
+  kvCache(request: string, protocol: KvProtocol, namespace: string, options?: Options): KvResult;
+  kvStats(): KvStats;
+  kvInit(options?: KvInitOptions): KvConfig;
+  kvClear(namespace?: string): void;
 }
 
 export type WasmSource = BufferSource | Response | URL | string;

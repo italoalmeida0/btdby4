@@ -112,26 +112,55 @@ export function handleRequest(prompt: string) {
 - `countImageBase64(base64Str: string): number`
 - `countImageBytes(bytes: Uint8Array | ArrayBuffer): number`
 
+> All payload APIs take a **raw JSON string** (the request body as-is).
+> Single `JSON.stringify` at the gateway, zero double conversion.
+
 ### OpenAI Chat API
-- `countChatRequest(request: object, options?: Options): Breakdown`
-- `countChatTotal(request: object, options?: Options): number`
-- `countChatMessage(message: object, options?: Options): BlockBreakdown`
-- `countChatPart(part: object, options?: Options): BlockBreakdown`
-- `countChatTool(tool: object): number`
+- `countChatRequest(request: string, options?: Options): Breakdown`
+- `countChatTotal(request: string, options?: Options): number`
+- `countChatMessage(message: string, options?: Options): BlockBreakdown`
+- `countChatPart(part: string, options?: Options): BlockBreakdown`
+- `countChatTool(tool: string): number`
 
 ### Anthropic Messages API
-- `countAnthropicRequest(request: object, options?: Options): Breakdown`
-- `countAnthropicTotal(request: object, options?: Options): number`
-- `countAnthropicMessage(message: object, options?: Options): BlockBreakdown`
-- `countAnthropicBlock(block: object, options?: Options): BlockBreakdown`
-- `countAnthropicTool(tool: object): number`
+- `countAnthropicRequest(request: string, options?: Options): Breakdown`
+- `countAnthropicTotal(request: string, options?: Options): number`
+- `countAnthropicMessage(message: string, options?: Options): BlockBreakdown`
+- `countAnthropicBlock(block: string, options?: Options): BlockBreakdown`
+- `countAnthropicTool(tool: string): number`
 
 ### OpenAI Responses API
-- `countResponsesRequest(request: object, options?: Options): Breakdown`
-- `countResponsesTotal(request: object, options?: Options): number`
-- `countResponsesItem(item: object, options?: Options): BlockBreakdown`
-- `countResponsesPart(part: object, options?: Options): BlockBreakdown`
-- `countResponsesTool(tool: object): number`
+- `countResponsesRequest(request: string, options?: Options): Breakdown`
+- `countResponsesTotal(request: string, options?: Options): number`
+- `countResponsesItem(item: string, options?: Options): BlockBreakdown`
+- `countResponsesPart(part: string, options?: Options): BlockBreakdown`
+- `countResponsesTool(tool: string): number`
+
+### KV-Cache Provider (prefix simulation)
+- `kvInit(options?: { ttlSeconds?: number; maxMB?: number; separateProtocol?: boolean }): KvConfig`
+- `kvCache(request: string, protocol: "anthropic" | "chat" | "responses", namespace: string, options?: Options): KvResult`
+- `kvStats(): KvStats`
+- `kvClear(namespace?: string): void`
+
+```typescript
+// Configure once at boot (defaults: 600s / 400MB / separateProtocol: true).
+btdby4.kvInit({ ttlSeconds: 600, maxMB: 400 });
+
+// namespace isolates like a real provider: provider|model|api-key
+// (the real key is protocol + namespace, unless separateProtocol: false)
+const ns = "openai|gpt-5|sk-123";
+
+const first = btdby4.kvCache(chatPayload, "chat", ns);
+// first.cached === 0, first.fresh === first.total
+
+const second = btdby4.kvCache(chatPayload, "chat", ns);
+// second.cached === second.total, second.fresh === 0
+
+// Conversation growth: prefix hits, suffix is fresh.
+// Sliding TTL (default 10min), memory cap with automatic LRU.
+// Token counts stay in stats for observability only.
+const stats = btdby4.kvStats();
+```
 
 ---
 
@@ -143,8 +172,6 @@ Measured on Apple Silicon / ARM64:
 | :--- | :--- | :--- | :--- |
 | **Medium Text (~100K tokens / 400 KB)** | **156 MB/s** | ~9.6 MB/s | **16.2x faster** |
 | **Large Text (~3M tokens / 8.3 MB)** | **94 MB/s** | ~8.4 MB/s | **11.2x faster** |
-
-*For even higher raw throughput (~2,500 MB/s) on Bun, check out [`btdby4-bun`](https://www.npmjs.com/package/btdby4-bun).*
 
 ---
 

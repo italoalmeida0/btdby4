@@ -1,7 +1,7 @@
 package main
 
 import (
-	"encoding/json"
+	json "github.com/goccy/go-json"
 	"syscall/js"
 
 	"github.com/italoalmeida0/btdby4"
@@ -367,6 +367,68 @@ func countResponsesToolJSON(this js.Value, args []js.Value) any {
 	return n
 }
 
+// --- KV-Cache provider (prefix simulation) ---
+//
+// kvCacheJSON(payload, protocol, namespace, tight, ignoreImages).
+func kvCacheJSON(this js.Value, args []js.Value) any {
+	if len(args) < 3 || args[0].IsNull() || args[0].IsUndefined() {
+		return `{"error":"missing json payload, protocol and namespace"}`
+	}
+	jsonStr := args[0].String()
+	protocol := args[1].String()
+	namespace := args[2].String()
+	tight := false
+	ignoreImages := false
+	if len(args) > 3 && !args[3].IsNull() && !args[3].IsUndefined() {
+		tight = args[3].Bool()
+	}
+	if len(args) > 4 && !args[4].IsNull() && !args[4].IsUndefined() {
+		ignoreImages = args[4].Bool()
+	}
+	opts := btdby4.Options{Tight: tight, IgnoreImages: ignoreImages}
+	res, err := btdby4.KvLookup([]byte(jsonStr), protocol, namespace, opts)
+	if err != nil {
+		errBytes, _ := json.Marshal(map[string]string{"error": err.Error()})
+		return string(errBytes)
+	}
+	out, _ := json.Marshal(res)
+	return string(out)
+}
+
+func kvStatsJSON(this js.Value, args []js.Value) any {
+	res, _ := json.Marshal(btdby4.KvStatsSnapshot())
+	return string(res)
+}
+
+// kvInit(ttlSeconds, maxMB, separateProtocol?). Defaults 600s / 400MB / true.
+// Clears existing entries. Returns the effective config as JSON.
+func kvInit(this js.Value, args []js.Value) any {
+	var ttl, mb int64
+	separate := true
+	if len(args) > 0 && !args[0].IsNull() && !args[0].IsUndefined() {
+		ttl = int64(args[0].Int())
+	}
+	if len(args) > 1 && !args[1].IsNull() && !args[1].IsUndefined() {
+		mb = int64(args[1].Int())
+	}
+	if len(args) > 2 && !args[2].IsNull() && !args[2].IsUndefined() {
+		separate = args[2].Bool()
+	}
+	btdby4.KvInit(ttl, mb)
+	btdby4.KvSetSeparateProtocol(separate)
+	res, _ := json.Marshal(btdby4.KvConfigSnapshot())
+	return string(res)
+}
+
+func kvClear(this js.Value, args []js.Value) any {
+	ns := ""
+	if len(args) > 0 && !args[0].IsNull() && !args[0].IsUndefined() {
+		ns = args[0].String()
+	}
+	btdby4.KvClear(ns)
+	return true
+}
+
 func main() {
 	obj := js.Global().Get("Object").New()
 	obj.Set("countText", js.FuncOf(countText))
@@ -392,6 +454,11 @@ func main() {
 	obj.Set("countResponsesItemJSON", js.FuncOf(countResponsesItemJSON))
 	obj.Set("countResponsesPartJSON", js.FuncOf(countResponsesPartJSON))
 	obj.Set("countResponsesToolJSON", js.FuncOf(countResponsesToolJSON))
+
+	obj.Set("kvCacheJSON", js.FuncOf(kvCacheJSON))
+	obj.Set("kvStatsJSON", js.FuncOf(kvStatsJSON))
+	obj.Set("kvInit", js.FuncOf(kvInit))
+	obj.Set("kvClear", js.FuncOf(kvClear))
 
 	js.Global().Set("__btdby4_wasm_instance", obj)
 

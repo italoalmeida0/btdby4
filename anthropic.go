@@ -1,7 +1,7 @@
 package btdby4
 
 import (
-	"encoding/json"
+	json "github.com/goccy/go-json"
 	"runtime"
 	"sync"
 
@@ -43,13 +43,6 @@ type BlockBreakdown struct {
 	TextTokens int `json:"text_tokens"`
 	ImageCount int `json:"image_count"`
 }
-
-// Legacy aliases kept for compatibility; prefer the Anthropic* names.
-type (
-	Request = AnthropicRequest
-	Message = AnthropicMessage
-	Tool    = AnthropicTool
-)
 
 // CountAnthropicRequest counts a full Anthropic Messages request.
 func CountAnthropicRequest(req AnthropicRequest, opts Options) (Breakdown, error) {
@@ -142,12 +135,15 @@ func countMessagesParallel(msgs []AnthropicMessage, opts Options, byMsg []int, t
 }
 
 // CountAnthropicRequestJSON counts a full request from raw JSON.
+// The request is decoded once and then counted + linearized in a
+// single walk (kvCountAnthropicRequest) shared with the KV cache path.
 func CountAnthropicRequestJSON(raw []byte, opts Options) (Breakdown, error) {
 	var req AnthropicRequest
-	if err := json.Unmarshal(raw, &req); err != nil {
+	if err := json.UnmarshalNoEscape(raw, &req); err != nil {
 		return Breakdown{}, err
 	}
-	return CountAnthropicRequest(req, opts)
+	bd, _, err := kvCountAnthropicRequest(req, opts)
+	return bd, err
 }
 
 // CountAnthropicBlock counts a single content block.
@@ -167,7 +163,7 @@ func CountAnthropicBlock(block map[string]any, opts Options) (BlockBreakdown, er
 // CountAnthropicBlockJSON counts a single content block from raw JSON.
 func CountAnthropicBlockJSON(raw []byte, opts Options) (BlockBreakdown, error) {
 	var block map[string]any
-	if err := json.Unmarshal(raw, &block); err != nil {
+	if err := json.UnmarshalNoEscape(raw, &block); err != nil {
 		return BlockBreakdown{}, err
 	}
 	return CountAnthropicBlock(block, opts)
@@ -190,7 +186,7 @@ func CountAnthropicMessage(msg AnthropicMessage, opts Options) (BlockBreakdown, 
 // CountAnthropicMessageJSON counts a single message from raw JSON.
 func CountAnthropicMessageJSON(raw []byte, opts Options) (BlockBreakdown, error) {
 	var msg AnthropicMessage
-	if err := json.Unmarshal(raw, &msg); err != nil {
+	if err := json.UnmarshalNoEscape(raw, &msg); err != nil {
 		return BlockBreakdown{}, err
 	}
 	return CountAnthropicMessage(msg, opts)
@@ -204,43 +200,10 @@ func CountAnthropicTool(tool AnthropicTool) (int, error) {
 // CountAnthropicToolJSON counts a tool definition from raw JSON.
 func CountAnthropicToolJSON(raw []byte) (int, error) {
 	var tool AnthropicTool
-	if err := json.Unmarshal(raw, &tool); err != nil {
+	if err := json.UnmarshalNoEscape(raw, &tool); err != nil {
 		return 0, err
 	}
 	return countTool(tool)
-}
-
-// Legacy wrappers kept for compatibility; prefer CountAnthropic*.
-func CountRequest(req AnthropicRequest, opts Options) (Breakdown, error) {
-	return CountAnthropicRequest(req, opts)
-}
-
-func CountRequestJSON(raw []byte, opts Options) (Breakdown, error) {
-	return CountAnthropicRequestJSON(raw, opts)
-}
-
-func CountMessage(msg AnthropicMessage, opts Options) (BlockBreakdown, error) {
-	return CountAnthropicMessage(msg, opts)
-}
-
-func CountMessageJSON(raw []byte, opts Options) (BlockBreakdown, error) {
-	return CountAnthropicMessageJSON(raw, opts)
-}
-
-func CountBlock(block map[string]any, opts Options) (BlockBreakdown, error) {
-	return CountAnthropicBlock(block, opts)
-}
-
-func CountBlockJSON(raw []byte, opts Options) (BlockBreakdown, error) {
-	return CountAnthropicBlockJSON(raw, opts)
-}
-
-func CountTool(tool AnthropicTool) (int, error) {
-	return CountAnthropicTool(tool)
-}
-
-func CountToolJSON(raw []byte) (int, error) {
-	return CountAnthropicToolJSON(raw)
 }
 
 func countMessage(m AnthropicMessage, opts Options) (tokens, images int, err error) {

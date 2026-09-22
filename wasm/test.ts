@@ -61,21 +61,22 @@ const chatPayload = {
   ]
 };
 
-const chatReq = estimator.countChatRequest(chatPayload, { tight: true });
+const chatJson = JSON.stringify(chatPayload);
+const chatReq = estimator.countChatRequest(chatJson, { tight: true });
 console.log(`   countChatRequest (tight): ${chatReq.total}`);
 console.assert(chatReq.total > 0, "Chat request total should be > 0");
 
-const chatTotal = estimator.countChatTotal(chatPayload, { tight: true });
+const chatTotal = estimator.countChatTotal(chatJson, { tight: true });
 console.log(`   countChatTotal   (tight): ${chatTotal}`);
 console.assert(chatTotal === chatReq.total, "countChatTotal should match breakdown total");
 
-const chatMsg = estimator.countChatMessage(chatPayload.messages[0]);
+const chatMsg = estimator.countChatMessage(JSON.stringify(chatPayload.messages[0]));
 console.log(`   countChatMessage (tokens): ${chatMsg.tokens}`);
 
-const chatPart = estimator.countChatPart({ type: "text", text: "quick test" });
+const chatPart = estimator.countChatPart(JSON.stringify({ type: "text", text: "quick test" }));
 console.log(`   countChatPart    (tokens): ${chatPart.tokens}`);
 
-const chatTool = estimator.countChatTool(chatPayload.tools[0]);
+const chatTool = estimator.countChatTool(JSON.stringify(chatPayload.tools[0]));
 console.log(`   countChatTool    (tokens): ${chatTool}`);
 
 // 5. Anthropic Messages
@@ -94,21 +95,22 @@ const anthropicPayload = {
   ]
 };
 
-const anthropicReq = estimator.countAnthropicRequest(anthropicPayload, { tight: true });
+const anthropicJson = JSON.stringify(anthropicPayload);
+const anthropicReq = estimator.countAnthropicRequest(anthropicJson, { tight: true });
 console.log(`   countAnthropicRequest (tight): ${anthropicReq.total}`);
 console.assert(anthropicReq.total > 0, "Anthropic request total should be > 0");
 
-const anthropicTotal = estimator.countAnthropicTotal(anthropicPayload, { tight: true });
+const anthropicTotal = estimator.countAnthropicTotal(anthropicJson, { tight: true });
 console.log(`   countAnthropicTotal   (tight): ${anthropicTotal}`);
 console.assert(anthropicTotal === anthropicReq.total, "countAnthropicTotal should match breakdown total");
 
-const anthropicMsg = estimator.countAnthropicMessage(anthropicPayload.messages[0]);
+const anthropicMsg = estimator.countAnthropicMessage(JSON.stringify(anthropicPayload.messages[0]));
 console.log(`   countAnthropicMessage (tokens): ${anthropicMsg.tokens}`);
 
-const anthropicBlock = estimator.countAnthropicBlock({ type: "text", text: "hi" });
+const anthropicBlock = estimator.countAnthropicBlock(JSON.stringify({ type: "text", text: "hi" }));
 console.log(`   countAnthropicBlock   (tokens): ${anthropicBlock.tokens}`);
 
-const anthropicTool = estimator.countAnthropicTool(anthropicPayload.tools[0]);
+const anthropicTool = estimator.countAnthropicTool(JSON.stringify(anthropicPayload.tools[0]));
 console.log(`   countAnthropicTool    (tokens): ${anthropicTool}`);
 
 // 6. OpenAI Responses API
@@ -122,23 +124,35 @@ const responsesPayload = {
   ]
 };
 
-const responsesReq = estimator.countResponsesRequest(responsesPayload, { tight: true });
+const responsesJson = JSON.stringify(responsesPayload);
+const responsesReq = estimator.countResponsesRequest(responsesJson, { tight: true });
 console.log(`   countResponsesRequest (tight): ${responsesReq.total}`);
 
-const responsesTotal = estimator.countResponsesTotal(responsesPayload, { tight: true });
+const responsesTotal = estimator.countResponsesTotal(responsesJson, { tight: true });
 console.log(`   countResponsesTotal   (tight): ${responsesTotal}`);
 
-const responsesItem = estimator.countResponsesItem(responsesPayload.input[0]);
+const responsesItem = estimator.countResponsesItem(JSON.stringify(responsesPayload.input[0]));
 console.log(`   countResponsesItem    (tokens): ${responsesItem.tokens}`);
 
-const responsesPart = estimator.countResponsesPart(responsesPayload.input[0].content[0]);
+const responsesPart = estimator.countResponsesPart(JSON.stringify(responsesPayload.input[0].content[0]));
 console.log(`   countResponsesPart    (tokens): ${responsesPart.tokens}`);
 
-const responsesTool = estimator.countResponsesTool(responsesPayload.tools[0]);
+const responsesTool = estimator.countResponsesTool(JSON.stringify(responsesPayload.tools[0]));
 console.log(`   countResponsesTool    (tokens): ${responsesTool}`);
 
-// 7. Micro-Benchmark
-console.log("\n7. Running Micro-Benchmark (10,000 iterations of countText)...");
+// 7. KV-Cache provider (string in, no double-stringify)
+console.log("\n7. Testing KV-Cache provider...");
+estimator.kvClear();
+const kvFirst = estimator.kvCache(chatJson, "chat", "test|model|key", { tight: true });
+console.log(`   kvCache miss: total=${kvFirst.total} cached=${kvFirst.cached} fresh=${kvFirst.fresh}`);
+console.assert(kvFirst.cached === 0 && kvFirst.fresh === kvFirst.total, "First call must be full miss");
+const kvSecond = estimator.kvCache(chatJson, "chat", "test|model|key", { tight: true });
+console.log(`   kvCache hit:  total=${kvSecond.total} cached=${kvSecond.cached} fresh=${kvSecond.fresh}`);
+console.assert(kvSecond.fresh === 0 && kvSecond.cached === kvSecond.total, "Repeat must be full hit");
+console.log(`   kvStats:`, estimator.kvStats());
+
+// 8. Micro-Benchmark
+console.log("\n8. Running Micro-Benchmark (10,000 iterations of countText)...");
 const benchIters = 10000;
 const benchStart = performance.now();
 for (let i = 0; i < benchIters; i++) {
@@ -153,4 +167,4 @@ console.log(`   Completed ${benchIters.toLocaleString()} calls in ${totalMs.toFi
 console.log(`   Average latency: ${perOpUs.toFixed(2)}µs per call`);
 console.log(`   Throughput:      ${opsPerSec.toLocaleString()} ops/second`);
 
-console.log("\n All 18 BTDby4 WASM functions tested and verified successfully!");
+console.log("\n All BTDby4 WASM functions tested and verified successfully!");
