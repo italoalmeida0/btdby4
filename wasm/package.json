@@ -1,7 +1,7 @@
 {
   "name": "btdby4-wasm",
-  "version": "1.1.1",
-  "description": "Universal WebAssembly high-performance LLM token estimator for Node.js, Bun, Deno, and Browser",
+  "version": "1.1.2",
+  "description": "The fastest and most complete LLM token estimator & KV-cache prefix simulator for Node.js, Bun, Deno, and Browsers",
   "main": "./index.js",
   "module": "./index.js",
   "types": "./index.d.ts",
